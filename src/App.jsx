@@ -193,7 +193,7 @@ function InnerApp() {
               <div className="user-avatar">{profile.avatar || profile.name?.charAt(0) || 'G'}</div>
               <div>
                 <div className="user-name">{profile.name}</div>
-                <div className="user-plan">EARLY ACCESS</div>
+                <div className="user-plan">ACESSO ANTECIPADO</div>
               </div>
             </div>
             <div className="sync-status mt-2">

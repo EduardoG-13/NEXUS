@@ -156,7 +156,7 @@ export default function SmartBuyV2({ wishlist }) {
                   Custo/Hora de Lazer = Preço ÷ Horas HLTB
                 </div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {`R$3/h `}{`= Excelente`}&nbsp;·&nbsp;{`R$3–7/h = Razoável`}&nbsp;·&nbsp;{`> R$7/h = Ineficiente`}&nbsp;·&nbsp;Netflix ≈ R$1,80/h
+                  {`R$3/h `}{`= Excelente`}&nbsp;·&nbsp;{`R$3–7/h = Razoável`}&nbsp;·&nbsp;{`> R$7/h = Ineficiente`}&nbsp;·&nbsp;Netflix ≈ R$1,80/h = benchmark
                 </div>
               </div>
             </div>
@@ -303,7 +303,7 @@ function WishlistPanel({ wishlist }) {
               </div>
               <div style={{ display: 'flex', gap: 5 }}>
                 <button className="btn btn-ghost" style={{ fontSize: 11 }}>🔔</button>
-                {w.currentPrice && <button className="btn" style={{ fontSize: 11 }}>🛒</button>}
+                {w.currentPrice && <button className="btn" style={{ fontSize: 11 }}>🛒 Comprar</button>}
               </div>
             </div>
           );

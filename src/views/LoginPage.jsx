@@ -52,7 +52,7 @@ export default function LoginPage({ onLogin }) {
             id="btn-connect-steam"
           >
             <span style={{ fontSize: 16 }}>🎮</span>
-            Connect with Steam
+            Conectar com Steam
           </button>
 
           <div className="login-divider"><span>ou</span></div>
@@ -63,7 +63,7 @@ export default function LoginPage({ onLogin }) {
             id="btn-login-email"
           >
             <span style={{ fontSize: 14 }}>📧</span>
-            Login with Email
+            Entrar com E-mail
           </button>
 
           <p className="login-legal">

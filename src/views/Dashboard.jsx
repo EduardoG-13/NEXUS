@@ -81,8 +81,8 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
     <div className="fade-in">
       <div className="page-header">
         <div>
-          <div className="page-title">Command Center</div>
-          <div className="page-subtitle">SITUATIONAL AWARENESS — BACKLOG HEALTH</div>
+          <div className="page-title">Centro de Comando</div>
+          <div className="page-subtitle">VISÃO TÁTICA — SAÚDE DO BACKLOG</div>
         </div>
         <div className="page-actions">
           <div style={{
@@ -90,7 +90,7 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
             background: 'var(--bg-card)', border: '1px solid var(--border)',
             padding: '4px 10px', borderRadius: 'var(--radius)',
           }}>
-            <span style={{ color: 'var(--green-bright)' }}>●</span> STEAM · SYNCED
+            <span style={{ color: 'var(--green-bright)' }}>●</span> STEAM · SINCRONIZADO
           </div>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
             {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()}
@@ -116,14 +116,14 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
             </span>
             <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 10, lineHeight: 1.7, textAlign: 'center' }}>
               {stats.backlog.length} jogos em backlog<br />
-              Use BURN para aumentar
+              Use 🔥 QUEIMAR para aumentar
             </p>
           </div>
 
           {/* Daily Prescription */}
           <div className="prescription-card">
             <div className="rx-top">
-              <div className="rx-badge">🩺 DAILY PRESCRIPTION</div>
+              <div className="rx-badge">🩺 MISSÃO DO DIA</div>
               <div className="rx-time-picks">
                 {TIME_OPTIONS.map(opt => (
                   <button

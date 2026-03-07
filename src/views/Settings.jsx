@@ -94,7 +94,7 @@ export default function Settings({ profile, onSave }) {
                 color: 'var(--accent)',
                 letterSpacing: '0.08em',
               }}>
-                ★ EARLY ACCESS — BETA GRATUITO
+                ★ ACESSO ANTECIPADO — BETA GRATUITO
               </div>
             </div>
           </div>
@@ -196,7 +196,7 @@ export default function Settings({ profile, onSave }) {
 
           {/* Dados */}
           <div className="settings-card" style={{ gridColumn: 'span 2' }}>
-            <div className="settings-card-title">// DADOS E PRIVACIDADE</div>
+            <div  className="settings-card-title">// DADOS E PRIVACIDADE</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               {[
                 { label: 'EXPORTAR BIBLIOTECA', desc: 'JSON com todos os seus dados', action: 'Exportar .json' },

@@ -13,19 +13,19 @@ function buildLogSequence(platform) {
   const p = platform.toUpperCase();
   return [
     { type: 'info',  text: `Iniciando autenticação OAuth com ${p}...` },
-    { type: 'ok',    text: `[AUTH OK] Token recebido.` },
-    { type: 'info',  text: `[FETCHING LIBRARY] Buscando biblioteca de jogos...` },
+    { type: 'ok',    text: `[AUTH OK] Token recebido com sucesso.` },
+    { type: 'info',  text: `[BUSCANDO BIBLIOTECA] Carregando seus jogos...` },
     { type: 'data',  text: `> 247 títulos encontrados na conta ${p}.` },
-    { type: 'info',  text: `[HLTB LOOKUP] Consultando HowLongToBeat.com...` },
-    { type: 'info',  text: `[FETCHING RECENT TITLES] Analisando jogos recentes...` },
-    { type: 'data',  text: `> Elden Ring · 55h main · 133h completionist` },
-    { type: 'data',  text: `> Hades · 22h main · 90h completionist` },
-    { type: 'data',  text: `> Baldur's Gate 3 · 100h main · 281h completionist` },
-    { type: 'info',  text: `[CALCULATING HLTB RATIO] Calculando Backlog Score...` },
-    { type: 'warn',  text: `! Backlog Score: 28/100 — CRÍTICO` },
-    { type: 'info',  text: `[SMART BUY] Verificando histórico de preços...` },
+    { type: 'info',  text: `[CONSULTA HLTB] Buscando tempos no HowLongToBeat.com...` },
+    { type: 'info',  text: `[ANÁLISE DE TÍTULOS] Processando jogos recentes...` },
+    { type: 'data',  text: `> Elden Ring · 55h história · 133h completar 100%` },
+    { type: 'data',  text: `> Hades · 22h história · 90h completar 100%` },
+    { type: 'data',  text: `> Baldur's Gate 3 · 100h história · 281h completar 100%` },
+    { type: 'info',  text: `[CALCULANDO BACKLOG SCORE] Analisando saúde do backlog...` },
+    { type: 'warn',  text: `! Backlog Score: 28/100 — CRÍTICO · muitos jogos acumulados` },
+    { type: 'info',  text: `[ROI ANALYSIS] Verificando histórico de preços e custo/hora...` },
     { type: 'data',  text: `> R$ 847,32 em capital parado no backlog.` },
-    { type: 'ok',    text: `[SYNC COMPLETE] Base de dados pronta.` },
+    { type: 'ok',    text: `[SINCRONIZAÇÃO CONCLUÍDA] Base de dados pronta.` },
   ];
 }
 
@@ -166,7 +166,7 @@ export default function SyncPage({ loginMethod, onComplete }) {
             style={{ padding: '10px 28px', fontSize: 13 }}
             id="btn-enter-dashboard"
           >
-            ✓ Entrar no Dashboard →
+            ✓ Acessar o Painel →
           </button>
         )}
         <button

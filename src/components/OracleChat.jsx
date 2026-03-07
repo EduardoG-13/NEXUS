@@ -64,7 +64,7 @@ function processCommand(input, games) {
     const { game, reason } = getPrescription(games, mins);
     if (!game) return { type: 'ai', text: '[SEM DADOS] Backlog vazio. Adicione jogos à biblioteca.' };
 
-    const cph = computeROI(game.price, game.ttbMain);
+    const cph = computeROI(game.pricePaid ?? game.price, game.ttbMain);
     return {
       type: 'ai',
       text: `[RECOMENDAÇÃO — ${mins < 60 ? mins + 'min' : mins / 60 + 'h'}]

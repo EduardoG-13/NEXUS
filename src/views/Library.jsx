@@ -127,7 +127,7 @@ export default function Library({ games, onBurn, onAddGame }) {
                   </td>
                   <td><span className="g-mono">{game.ttbMain}h</span></td>
                   <td><span className="g-mono dim">{game.ttbFull}h</span></td>
-                  <td><span className="g-mono dim">R${game.price.toFixed(0)}</span></td>
+                  <td><span className="g-mono dim">R${(game.pricePaid ?? game.price ?? 0).toFixed(0)}</span></td>
                   <td>
                     <span className="g-mono" style={{
                       color: game.metacritic >= 90 ? 'var(--green-bright)'
