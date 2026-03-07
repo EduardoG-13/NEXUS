@@ -1,4 +1,4 @@
-# BacklogBurner 🔥
+# Nexus 🔥
 
 > **Otimize seu lazer. Queime o backlog. Calcule o ROI da diversão.**
 
@@ -35,7 +35,7 @@ npm run dev
 # 1. Push para o GitHub
 git init
 git add .
-git commit -m "feat: BacklogBurner MVP v3"
+git commit -m "feat: Nexus MVP v4"
 git remote add origin https://github.com/SEU_USUARIO/backlog-burner.git
 git push -u origin main
 ```
@@ -53,4 +53,4 @@ O `netlify.toml` e `public/_redirects` já estão configurados para SPA.
 
 ---
 
-*BacklogBurner v3.0 · Hackathon Pitch*
+*Nexus v4.0 · Hackathon Pitch*

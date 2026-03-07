@@ -128,7 +128,7 @@ function InnerApp() {
           <div className="sidebar-brand">
             <div className="brand-mark">B</div>
             <div>
-              <div className="brand-text">BacklogBurner</div>
+              <div className="brand-text">Nexus</div>
               <div className="brand-version">v4.0 · BETA</div>
             </div>
           </div>

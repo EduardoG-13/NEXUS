@@ -77,7 +77,7 @@ export default function SyncPage({ loginMethod, onComplete }) {
       <div className="sync-brand">
         <div className="brand-mark">B</div>
         <div>
-          <div className="brand-text" style={{ fontSize: 15, fontWeight: 600 }}>BacklogBurner</div>
+          <div className="brand-text" style={{ fontSize: 15, fontWeight: 600 }}>Nexus</div>
           <div className="brand-version">CONECTAR PLATAFORMAS</div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function SyncPage({ loginMethod, onComplete }) {
             <div className="terminal-dot" style={{ background: '#EAB308' }} />
             <div className="terminal-dot" style={{ background: '#22C55E' }} />
           </div>
-          <div className="terminal-title">backlogburner · sync-engine · v2.0</div>
+          <div className="terminal-title">nexus · sync-engine · v4.0</div>
         </div>
         <div
           className="terminal-body"

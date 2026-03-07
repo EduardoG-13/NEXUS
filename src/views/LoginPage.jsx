@@ -5,7 +5,7 @@ export default function LoginPage({ onLogin }) {
       {/* Left Art Panel */}
       <div className="login-art">
         <div className="login-art-content">
-          <div className="art-tagline">// backlogburner.gg</div>
+          <div className="art-tagline">// nexus.gg</div>
           <h1 className="art-headline">
             Seu tempo é seu<br />
             <span>ativo mais valioso.</span><br />
@@ -28,7 +28,7 @@ export default function LoginPage({ onLogin }) {
           </div>
         </div>
         <div className="art-footer">
-          BACKLOGBURNER v2.0 · MVP PITCH DEMO · 2026
+          NEXUS v4.0 · MVP PITCH DEMO · 2026
         </div>
       </div>
 
@@ -38,7 +38,7 @@ export default function LoginPage({ onLogin }) {
           <div className="login-brand">
             <div className="brand-mark">B</div>
             <div>
-              <div className="brand-text">BacklogBurner</div>
+              <div className="brand-text">Nexus</div>
               <div className="brand-version">BETA — ACESSO ANTECIPADO</div>
             </div>
           </div>
