@@ -126,7 +126,7 @@ function InnerApp() {
         {/* ─── Sidebar ─── */}
         <aside className="sidebar">
           <div className="sidebar-brand">
-            <div className="brand-mark">B</div>
+            <img src="/logo.jpeg" alt="Nexus" style={{ height: 32, width: 32, objectFit: 'contain', borderRadius: 2, flexShrink: 0 }} />
             <div>
               <div className="brand-text">Nexus</div>
               <div className="brand-version">v4.0 · BETA</div>

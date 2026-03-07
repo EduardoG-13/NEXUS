@@ -75,7 +75,7 @@ export default function SyncPage({ loginMethod, onComplete }) {
   return (
     <div className="sync-page fade-in">
       <div className="sync-brand">
-        <div className="brand-mark">B</div>
+        <img src="/logo.jpeg" alt="Nexus" style={{ height: 32, width: 32, objectFit: 'contain', borderRadius: 2 }} />
         <div>
           <div className="brand-text" style={{ fontSize: 15, fontWeight: 600 }}>Nexus</div>
           <div className="brand-version">CONECTAR PLATAFORMAS</div>

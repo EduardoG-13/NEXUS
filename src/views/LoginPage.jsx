@@ -36,7 +36,7 @@ export default function LoginPage({ onLogin }) {
       <div className="login-panel">
         <div className="login-form-wrap">
           <div className="login-brand">
-            <div className="brand-mark">B</div>
+            <img src="/logo.jpeg" alt="Nexus" style={{ height: 36, width: 36, objectFit: 'contain', borderRadius: 2 }} />
             <div>
               <div className="brand-text">Nexus</div>
               <div className="brand-version">BETA — ACESSO ANTECIPADO</div>
