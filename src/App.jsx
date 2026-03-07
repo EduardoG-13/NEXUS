@@ -1,169 +1,127 @@
 import { useState, useCallback } from 'react';
 import './index.css';
-import { GAMES } from './data';
-import LoginPage     from './views/LoginPage';
-import SyncPage      from './views/SyncPage';
-import Dashboard     from './views/Dashboard';
-import Library       from './views/Library';
-import SmartBuy      from './views/SmartBuy';
-import Settings      from './views/Settings';
-import AddGameModal  from './components/AddGameModal';
-import OracleChat    from './components/OracleChat';
+import { GAMES_DEFAULT, WISHLIST_DEFAULT } from './data';
+import { useLocalStorage } from './hooks/useLocalStorage';
+import { ToastProvider, useToast } from './components/ToastSystem';
+
+import LoginPage         from './views/LoginPage';
+import SyncPage          from './views/SyncPage';
+import Dashboard         from './views/Dashboard';
+import Library           from './views/Library';
+import SmartBuyV2        from './views/SmartBuyV2';
+import TacticalCalendar  from './views/TacticalCalendar';
+import Settings          from './views/Settings';
+import AddGameModal      from './components/AddGameModal';
+import OracleV2          from './components/OracleV2';
 
 // ============================================================
-// APP STATE: 'login' | 'sync' | 'app'
-// VIEW STATE: 'dashboard' | 'library' | 'smartbuy' | 'settings'
+// NAV ITEMS
 // ============================================================
-
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '▣', label: 'Centro de Comando' },
-  { id: 'library',   icon: '☰', label: 'Biblioteca'       },
+  { id: 'library',   icon: '☰', label: 'Biblioteca'        },
   { id: 'smartbuy',  icon: '◈', label: 'Compra Inteligente' },
+  { id: 'calendar',  icon: '⬡', label: 'Calendário Tático'  },
 ];
 
-const HINTS = {
+const INSIGHTS = {
   dashboard: (games) => {
     const bl = games.filter(g => g.status === 'backlog');
-    const R = bl.reduce((s, g) => s + g.price, 0);
+    const R = bl.reduce((s, g) => s + (g.pricePaid || 0), 0);
     const h = bl.reduce((s, g) => s + g.ttbMain, 0);
-    return `${bl.length} jogos no backlog · R$${R.toFixed(0)} em capital parado · ${h}h de lazer por aproveitar.`;
+    return `${bl.length} jogos no backlog · R$${R.toFixed(0)} em capital parado · ${h}h de lazer por aproveitar. $19bi em jogos dormem na Steam — não seja parte da estatística.`;
   },
-  library:   () => `Dica: use 🔥 QUEIMAR em jogos que você nunca vai jogar. Cada decisão libera carga mental.`,
-  smartbuy:  () => `Referência: Netflix ≈ R$1,80/h de conteúdo. Qualquer jogo abaixo de R$3/h é eficiente.`,
-  settings:  () => `Suas preferências são salvas localmente no navegador.`,
+  library:   () => `Dica: 🔥 QUEIMAR remove o jogo do backlog e aumenta seu Score. Cada decisão deliberada libera carga mental.`,
+  smartbuy:  () => `Benchmark: Netflix ≈ R$1,80/h. Qualquer jogo abaixo de R$3/h é um investimento eficiente em lazer.`,
+  calendar:  (_, cal) => {
+    const n = Object.keys(cal || {}).length;
+    return `${n} sessão(ões) agendada(s) esta semana. Jogadores que planejam jogam 2x mais horas com mais satisfação.`;
+  },
+  settings:  () => `Configurações salvas localmente no navegador.`,
 };
 
-const DEFAULT_PROFILE = {
-  name: 'Gamer#7423',
-  avatar: 'G',
-  platforms: ['steam'],
-  theme: 'dark',
-  hltbPref: 'main',
-};
+// ============================================================
+// INNER APP (inside ToastProvider — can use useToast)
+// ============================================================
+function InnerApp() {
+  const { push } = useToast();
 
-export default function App() {
-  // Auth flow
+  // ─── Auth state ───────────────────────
   const [appState,    setAppState]   = useState('login');
   const [loginMethod, setLoginMethod] = useState(null);
+  const [view,        setView]        = useState('dashboard');
 
-  // Navigation
-  const [view, setView] = useState('dashboard');
+  // ─── Persisted state (localStorage) ──
+  const [games,    setGames]    = useLocalStorage('bb_games',    GAMES_DEFAULT);
+  const [profile,  setProfile]  = useLocalStorage('bb_profile',  { name: 'Gamer#7423', avatar: 'G', platforms: ['steam'], hltbPref: 'main' });
+  const [calendar, setCalendar] = useLocalStorage('bb_calendar', {});
+  const wishlist = WISHLIST_DEFAULT; // Wishlist é read-only por ora (mock)
 
-  // Data
-  const [games,   setGames]   = useState(GAMES);
-  const [profile, setProfile] = useState(DEFAULT_PROFILE);
+  // ─── Ephemeral UI ─────────────────────
+  const [scoreBonus,   setScoreBonus]   = useState(0);
+  const [showModal,    setShowModal]    = useState(false);
+  const [showOracle,   setShowOracle]   = useState(false);
+  const [burnToasts,   setBurnToasts]   = useState([]);
+  const [showFlash,    setShowFlash]    = useState(false);
 
-  // Score bonus (from BURN actions)
-  const [scoreBonus, setScoreBonus] = useState(0);
+  // ─── Auth ────────────────────────────
+  function handleLogin(method) { setLoginMethod(method); setAppState('sync'); }
+  function handleSyncComplete() { setAppState('app'); }
 
-  // UI state
-  const [showModal,  setShowModal]  = useState(false);
-  const [showOracle, setShowOracle] = useState(false);
-  const [burnToasts, setBurnToasts] = useState([]); // [{ id, pts }]
-  const [showFlash,  setShowFlash]  = useState(false);
-
-  // ──────────────────────────────────────────────────────────
-  // Auth handlers
-  // ──────────────────────────────────────────────────────────
-  function handleLogin(method) {
-    setLoginMethod(method);
-    setAppState('sync');
-  }
-
-  function handleSyncComplete() {
-    setAppState('app');
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // BURN — remove jogo + score +5 + flash + toast
-  // ──────────────────────────────────────────────────────────
+  // ─── BURN ────────────────────────────
   const handleBurn = useCallback((id) => {
+    const game = games.find(g => g.id === id);
     setGames(prev => prev.filter(g => g.id !== id));
     setScoreBonus(prev => prev + 5);
-
-    // Flash de tela
     setShowFlash(true);
     setTimeout(() => setShowFlash(false), 600);
+    const tid = Date.now();
+    setBurnToasts(prev => [...prev, { id: tid }]);
+    setTimeout(() => setBurnToasts(prev => prev.filter(t => t.id !== tid)), 2100);
+    push('burn', `🔥 "${game?.title ?? 'Jogo'}" queimado · Backlog Score +5pts`);
+  }, [games, push, setGames]);
 
-    // Floating toast +5pts
-    const toastId = Date.now();
-    setBurnToasts(prev => [...prev, { id: toastId, pts: 5 }]);
-    setTimeout(() => setBurnToasts(prev => prev.filter(t => t.id !== toastId)), 2100);
-  }, []);
+  const handleScoreBonusUsed = useCallback(() => setScoreBonus(0), []);
 
-  const handleScoreBonusUsed = useCallback(() => {
-    setScoreBonus(0);
-  }, []);
-
-  // ──────────────────────────────────────────────────────────
-  // Add Game
-  // ──────────────────────────────────────────────────────────
+  // ─── Add Game ────────────────────────
   function handleAddGame(newGame) {
     setGames(prev => [newGame, ...prev]);
-    // New backlog game = reduce score
-    if (newGame.status === 'backlog') {
-      setScoreBonus(prev => Math.max(0, prev - 3));
-    }
+    push('info', `✓ "${newGame.title}" adicionado à biblioteca.`);
   }
 
-  // ──────────────────────────────────────────────────────────
-  // Settings save
-  // ──────────────────────────────────────────────────────────
+  // ─── Profile ─────────────────────────
   function handleSaveProfile(updated) {
     setProfile(updated);
+    push('saved', '✓ Configurações salvas.');
   }
 
-  // ──────────────────────────────────────────────────────────
-  // Route: Login / Sync
-  // ──────────────────────────────────────────────────────────
+  // ─── Route guards ─────────────────────
   if (appState === 'login') return <LoginPage onLogin={handleLogin} />;
   if (appState === 'sync')  return <SyncPage loginMethod={loginMethod} onComplete={handleSyncComplete} />;
 
   const backlogCount = games.filter(g => g.status === 'backlog').length;
 
-  // ──────────────────────────────────────────────────────────
-  // Main App Shell
-  // ──────────────────────────────────────────────────────────
   return (
     <>
-      {/* Burn flash overlay */}
+      {/* Flash overlay */}
       {showFlash && <div className="burn-flash" key={Date.now()} />}
 
       {/* Floating score toasts */}
       {burnToasts.map(t => (
-        <div key={t.id} className="score-float-toast">
-          🔥 QUEIMADO · SCORE +{t.pts}pts
-        </div>
+        <div key={t.id} className="score-float-toast">🔥 QUEIMADO · SCORE +5pts</div>
       ))}
 
-      {/* Add Game Modal */}
-      {showModal && (
-        <AddGameModal
-          onClose={() => setShowModal(false)}
-          onSave={handleAddGame}
-        />
-      )}
+      {/* Modals */}
+      {showModal  && <AddGameModal onClose={() => setShowModal(false)} onSave={handleAddGame} />}
+      {showOracle && <OracleV2 games={games} calendar={calendar} wishlist={wishlist} onClose={() => setShowOracle(false)} />}
 
-      {/* O Oráculo Chat */}
-      {showOracle && (
-        <OracleChat
-          games={games}
-          onClose={() => setShowOracle(false)}
-        />
-      )}
-
-      {/* Oracle FAB (hidden when oracle is open) */}
-      {!showOracle && appState === 'app' && (
-        <button
-          className="oracle-fab"
-          onClick={() => setShowOracle(true)}
-          id="btn-open-oracle"
-        >
+      {/* Oracle FAB */}
+      {!showOracle && (
+        <button className="oracle-fab" onClick={() => setShowOracle(true)} id="btn-oracle-fab">
           <span>⬡</span> O ORÁCULO
         </button>
       )}
 
-      {/* App Shell */}
       <div className="app-shell">
         {/* ─── Sidebar ─── */}
         <aside className="sidebar">
@@ -171,7 +129,7 @@ export default function App() {
             <div className="brand-mark">B</div>
             <div>
               <div className="brand-text">BacklogBurner</div>
-              <div className="brand-version">v3.0 · BETA</div>
+              <div className="brand-version">v4.0 · BETA</div>
             </div>
           </div>
 
@@ -189,10 +147,14 @@ export default function App() {
                 {item.id === 'library' && backlogCount > 0 && (
                   <span className="nav-badge">{backlogCount}</span>
                 )}
+                {item.id === 'calendar' && Object.keys(calendar).length > 0 && (
+                  <span className="nav-badge" style={{ background: 'var(--green-dim)', color: 'var(--green-bright)', borderColor: 'var(--green-border)' }}>
+                    {Object.keys(calendar).length}
+                  </span>
+                )}
               </button>
             ))}
 
-            {/* Quick Add */}
             <button
               className="nav-item"
               style={{ marginTop: 8, border: '1px dashed var(--border-hi)', color: 'var(--text-muted)' }}
@@ -228,7 +190,7 @@ export default function App() {
 
           <div className="sidebar-footer">
             <div className="sidebar-user">
-              <div className="user-avatar">{profile.avatar}</div>
+              <div className="user-avatar">{profile.avatar || profile.name?.charAt(0) || 'G'}</div>
               <div>
                 <div className="user-name">{profile.name}</div>
                 <div className="user-plan">EARLY ACCESS</div>
@@ -241,36 +203,56 @@ export default function App() {
           </div>
         </aside>
 
-        {/* ─── Main Content ─── */}
+        {/* ─── Main ─── */}
         <main className="main-content">
           {view === 'dashboard' && (
             <Dashboard
               games={games}
               scoreBonus={scoreBonus}
               onScoreBonusUsed={handleScoreBonusUsed}
+              calendar={calendar}
             />
           )}
           {view === 'library' && (
-            <Library
+            <Library games={games} onBurn={handleBurn} onAddGame={() => setShowModal(true)} />
+          )}
+          {view === 'smartbuy'  && <SmartBuyV2 wishlist={wishlist} />}
+          {view === 'calendar'  && (
+            <TacticalCalendar
               games={games}
-              onBurn={handleBurn}
-              onAddGame={() => setShowModal(true)}
+              calendar={calendar}
+              onCalendarChange={setCalendar}
+              wishlist={wishlist}
             />
           )}
-          {view === 'smartbuy' && <SmartBuy />}
-          {view === 'settings' && (
+          {view === 'settings'  && (
             <Settings profile={profile} onSave={handleSaveProfile} />
           )}
 
-          {/* Insight Footer */}
+          {/* Insight footer */}
           {view !== 'settings' && (
             <div className="insight-footer">
               <span className="insight-tag">INSIGHT</span>
-              <span>{HINTS[view]?.(games)}</span>
+              <span>{INSIGHTS[view]?.(games, calendar)}</span>
             </div>
           )}
         </main>
       </div>
     </>
+  );
+}
+
+// ============================================================
+// ROOT — wraps with ToastProvider so useToast works inside
+// ============================================================
+export default function App() {
+  // Need games + calendar at root level for ToastProvider's setInterval
+  const [games]    = useLocalStorage('bb_games',    GAMES_DEFAULT);
+  const [calendar] = useLocalStorage('bb_calendar', {});
+
+  return (
+    <ToastProvider calendar={calendar} games={games}>
+      <InnerApp />
+    </ToastProvider>
   );
 }
