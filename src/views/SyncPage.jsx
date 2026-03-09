@@ -147,8 +147,8 @@ export default function SyncPage({ loginMethod, onComplete }) {
         ))}
       </div>
 
-      {/* Input Steam ID — aparece somente quando Steam está selecionado */}
-      {selected.includes('steam') && steamConfigured && (
+      {/* Input Steam ID — sempre aparece quando Steam está selecionado para o usuário não ficar perdido */}
+      {selected.includes('steam') && (
         <div style={{ margin: '12px 0', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>
             STEAM ID64 (encontre em steamidfinder.com)
