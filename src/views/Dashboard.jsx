@@ -1,11 +1,56 @@
 import { useState, useMemo, useEffect } from 'react';
-import { computeStats, getPrescription } from '../data';
+import { computeStats, computeROI } from '../data';
 
 const TIME_OPTIONS = [
+  { label: '15 min', value: 15 },
   { label: '30 min', value: 30 },
   { label: '1h',     value: 60 },
   { label: '2h+',    value: 120 },
 ];
+
+/** Detecta tempo sugerido com base na hora atual do dia */
+function suggestTimeByHour() {
+  const h = new Date().getHours();
+  if (h >= 6  && h < 9)  return 30;
+  if (h >= 9  && h < 12) return 60;
+  if (h >= 12 && h < 14) return 30;
+  if (h >= 14 && h < 18) return 60;
+  if (h >= 18 && h < 22) return 120;
+  return 60;
+}
+
+/** Seleciona o melhor jogo do backlog para o tempo disponível */
+function pickGame(backlog, availMin, skip) {
+  if (!backlog.length) return null;
+  let pool = backlog.filter(g => {
+    if (!g.ttbMain) return availMin >= 60;
+    if (availMin <= 30)  return g.ttbMain <= 20;
+    if (availMin <= 60)  return g.ttbMain <= 50;
+    return true;
+  });
+  if (!pool.length) pool = backlog;
+  const sorted = [...pool].sort((a, b) => {
+    const ra = computeROI(a.pricePaid ?? a.price, a.ttbMain) ?? 10;
+    const rb = computeROI(b.pricePaid ?? b.price, b.ttbMain) ?? 10;
+    const ma = (a.metacritic ?? 75) / 100;
+    const mb = (b.metacritic ?? 75) / 100;
+    return (mb / rb) - (ma / ra);
+  });
+  return sorted[skip % sorted.length];
+}
+
+function hourLabel() {
+  const h = new Date().getHours();
+  if (h >= 6  && h < 12) return '🌅 Manhã';
+  if (h >= 12 && h < 18) return '☀️ Tarde';
+  if (h >= 18 && h < 22) return '🌙 Noite';
+  return '🌃 Madrugada';
+}
+
+function steamImg(appId) {
+  return appId ? `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg` : null;
+}
+
 
 function ScoreRing({ score, health }) {
   const R = 46, cx = 52, cy = 52, circ = 2 * Math.PI * R;
@@ -30,14 +75,17 @@ function ScoreRing({ score, health }) {
   );
 }
 
-export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
-  const [availMin, setAvailMin]   = useState(60);
-  const [bump, setBump]           = useState(false);
+export default function Dashboard({ games, scoreBonus, onScoreBonusUsed, calendar }) {
+  const [availMin, setAvailMin] = useState(() => suggestTimeByHour());
+  const [skip,     setSkip]     = useState(0);
+  const [bump,     setBump]     = useState(false);
 
-  const stats       = useMemo(() => computeStats(games), [games]);
-  const prescription = useMemo(() => getPrescription(games, availMin), [games, availMin]);
+  const stats   = useMemo(() => computeStats(games), [games]);
+  const backlog = useMemo(() => games.filter(g => g.status === 'backlog'), [games]);
+  const pick    = useMemo(() => pickGame(backlog, availMin, skip), [backlog, availMin, skip]);
+  const pickImg = pick?.cover ?? (pick?.steamAppId ? steamImg(pick.steamAppId) : null);
+  const pickCph = pick ? computeROI(pick.pricePaid ?? pick.price, pick.ttbMain) : null;
 
-  // Trigger bump animation when score changes due to burns
   useEffect(() => {
     if (scoreBonus > 0) {
       setBump(true);
@@ -53,25 +101,20 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
       label: 'CAPITAL PARADO',
       val: `R$${stats.backlogSpent.toFixed(0)}`,
       sub: `de R$${stats.totalSpent.toFixed(0)} total investido`,
-      color: 'c-red',
-      barW: stats.backlogSpent / stats.totalSpent,
-      barC: 'var(--red)',
+      color: 'c-red', barW: stats.totalSpent > 0 ? stats.backlogSpent / stats.totalSpent : 0, barC: 'var(--red)',
     },
     {
       label: 'HORAS DE BACKLOG',
       val: `${stats.backlogHours}h`,
       sub: `≈ ${Math.round(stats.backlogHours / 8)} dias de gameplay`,
-      color: 'c-yellow',
-      barW: stats.backlogHours / stats.totalHours,
-      barC: 'var(--yellow)',
+      color: 'c-yellow', barW: stats.totalHours > 0 ? stats.backlogHours / stats.totalHours : 0, barC: 'var(--yellow)',
     },
     {
       label: 'TAXA DE CONCLUSÃO',
       val: `${stats.completionPct}%`,
       sub: `${stats.finished.length} de ${stats.total} jogos`,
       color: stats.completionPct >= 50 ? 'c-green' : 'c-accent',
-      barW: stats.completionPct / 100,
-      barC: stats.completionPct >= 50 ? 'var(--green-bright)' : 'var(--accent)',
+      barW: stats.completionPct / 100, barC: stats.completionPct >= 50 ? 'var(--green-bright)' : 'var(--accent)',
     },
   ];
 
@@ -88,13 +131,12 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
           <div style={{
             fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)',
             background: 'var(--bg-card)', border: '1px solid var(--border)',
-            padding: '4px 10px', borderRadius: 'var(--radius)',
+            padding: '4px 10px',
           }}>
-            <span style={{ color: 'var(--green-bright)' }}>●</span> STEAM · SINCRONIZADO
-          </div>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
+            <span style={{ color: 'var(--accent)' }}>{hourLabel()}</span>
+            &nbsp;·&nbsp;
             {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase()}
-          </span>
+          </div>
         </div>
       </div>
 
@@ -123,13 +165,13 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
           {/* Daily Prescription */}
           <div className="prescription-card">
             <div className="rx-top">
-              <div className="rx-badge">🩺 MISSÃO DO DIA</div>
+              <div className="rx-badge">MISSÃO DO DIA</div>
               <div className="rx-time-picks">
                 {TIME_OPTIONS.map(opt => (
                   <button
                     key={opt.value}
                     className={`rx-time-btn ${availMin === opt.value ? 'active' : ''}`}
-                    onClick={() => setAvailMin(opt.value)}
+                    onClick={() => { setAvailMin(opt.value); setSkip(0); }}
                     id={`rx-time-${opt.value}`}
                   >
                     {opt.label}
@@ -138,23 +180,46 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
               </div>
             </div>
 
-            {prescription.game ? (
+            {pick ? (
               <div className="rx-body">
-                <div className="rx-cover">{prescription.game.emoji}</div>
+                {/* Imagem Steam CDN */}
+                {pickImg ? (
+                  <img
+                    src={pickImg}
+                    alt={pick.title}
+                    style={{
+                      width: 64, height: 40, objectFit: 'cover',
+                      border: '1px solid var(--border)', flexShrink: 0,
+                    }}
+                    onError={e => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="rx-cover">{pick.emoji}</div>
+                )}
                 <div className="rx-info">
-                  <div className="rx-game-title">{prescription.game.title}</div>
+                  <div className="rx-game-title">{pick.title}</div>
                   <div className="rx-chips">
-                    <span className="rx-chip hi">⏱ {availMin < 60 ? `${availMin}min` : `${availMin/60}h`} disponíveis</span>
-                    <span className="rx-chip">🎮 {prescription.game.ttbMain}h main</span>
-                    <span className="rx-chip">⭐ MC {prescription.game.metacritic}</span>
-                    <span className="rx-chip">{prescription.game.genre}</span>
+                    <span className="rx-chip hi">{availMin < 60 ? `${availMin}min` : `${availMin/60}h`} disponíveis</span>
+                    {pick.ttbMain && <span className="rx-chip">{pick.ttbMain}h HLTB</span>}
+                    {pick.metacritic && <span className="rx-chip">MC {pick.metacritic}</span>}
+                    {pickCph != null
+                      ? <span className="rx-chip">R${pickCph.toFixed(2)}/h ROI</span>
+                      : <span className="rx-chip" style={{ color: 'var(--yellow)' }}>Adicione o preço para ROI</span>
+                    }
+                    <span className="rx-chip">{pick.genre ?? 'Steam'}</span>
                   </div>
-                  <p className="rx-reason">{prescription.reason}</p>
+                  <p className="rx-reason">
+                    Seleção para {hourLabel().split(' ')[1] ?? 'agora'}:
+                    melhor custo-benefício do seu backlog para o tempo disponível.
+                    {backlog.length > 1 ? ` (${backlog.length} jogos no backlog)` : ''}
+                  </p>
                 </div>
               </div>
             ) : (
-              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                Backlog vazio. Adicione jogos para receber recomendações.
+              <p style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+                {games.length === 0
+                  ? '[BIBLIOTECA VAZIA] Sincronize a Steam para receber recomendações personalizadas.'
+                  : 'Nenhum jogo compatível com o tempo selecionado.'}
               </p>
             )}
 
@@ -162,7 +227,15 @@ export default function Dashboard({ games, scoreBonus, onScoreBonusUsed }) {
               <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
                 ▶ Iniciar Sessão
               </button>
-              <button className="btn btn-ghost" style={{ fontSize: 12 }}>Outra Sugestão</button>
+              {backlog.length > 1 && (
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12 }}
+                  onClick={() => setSkip(s => s + 1)}
+                >
+                  Outra Sugestão
+                </button>
+              )}
             </div>
           </div>
 

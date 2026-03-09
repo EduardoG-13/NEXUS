@@ -1,102 +1,151 @@
 // ============================================================
-// SMART BUY V2 — Inteligência de Mercado
-// Grid de oportunidades + ROI badge + Menor Preço Histórico
+// SMART BUY V3 — Loja Inteligente
+// Aba 1: ROI da Biblioteca (jogos do usuário)
+// Aba 2: Recomendações (curada por gênero + ROI)
+// Images 25% menores vs versão anterior
 // ============================================================
 import { useState, useMemo } from 'react';
 import { computeROI } from '../data';
 
-const SORT_OPTIONS = [
-  { id: 'roi',   label: 'Melhor ROI' },
-  { id: 'price', label: 'Menor Preço' },
-  { id: 'mc',    label: 'Metacritic' },
+// ── Lista curada de jogos recomendados para compra ──────────
+// Fonte: Steam CDN público (sem API key). Preços em BRL.
+const RECOMMENDED = [
+  { id: 'r1',  title: 'Elden Ring',           appId: 1245620, genre: 'Action RPG',     price: 189.90, ttbMain: 55,  mc: 96  },
+  { id: 'r2',  title: "Baldur's Gate 3",      appId: 1086940, genre: 'RPG',            price: 199.90, ttbMain: 100, mc: 96  },
+  { id: 'r3',  title: 'Hollow Knight',        appId: 367520,  genre: 'Metroidvania',   price: 14.90,  ttbMain: 25,  mc: 90  },
+  { id: 'r4',  title: 'Hades',                appId: 1145360, genre: 'Roguelike',      price: 34.90,  ttbMain: 22,  mc: 93  },
+  { id: 'r5',  title: 'Disco Elysium',        appId: 632470,  genre: 'RPG',            price: 29.90,  ttbMain: 22,  mc: 91  },
+  { id: 'r6',  title: 'Celeste',              appId: 504230,  genre: 'Plataforma',     price: 19.90,  ttbMain: 9,   mc: 94  },
+  { id: 'r7',  title: 'Portal 2',             appId: 620,     genre: 'Puzzle',         price: 9.90,   ttbMain: 9,   mc: 95  },
+  { id: 'r8',  title: 'Sekiro',              appId: 814380,  genre: 'Action',         price: 149.90, ttbMain: 30,  mc: 91  },
+  { id: 'r9',  title: 'Cyberpunk 2077',       appId: 1091500, genre: 'Action RPG',     price: 89.90,  ttbMain: 28,  mc: 86  },
+  { id: 'r10', title: 'Ori Will of Wisps',   appId: 1057090, genre: 'Metroidvania',   price: 39.90,  ttbMain: 9,   mc: 93  },
+  { id: 'r11', title: 'Returnal',             appId: 1649240, genre: 'Roguelike',      price: 179.90, ttbMain: 25,  mc: 86  },
+  { id: 'r12', title: 'God of War',           appId: 1593500, genre: 'Action',         price: 119.90, ttbMain: 21,  mc: 94  },
 ];
 
+function steamImg(appId) {
+  return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+}
+
 function cphColor(cph) {
-  if (cph === null) return 'var(--text-muted)';
-  if (cph <= 3) return 'var(--green-bright)';
-  if (cph <= 7) return 'var(--yellow)';
+  if (cph == null) return 'var(--text-muted)';
+  if (cph <= 3)   return 'var(--green-bright)';
+  if (cph <= 7)   return 'var(--yellow)';
   return 'var(--red)';
 }
 
-function verdict(cph, isFree) {
-  if (isFree) return { icon: '✅', text: '∞ ROI — Custo zero.' };
-  if (cph === null) return { icon: '⏳', text: 'Dados insuficientes' };
-  if (cph <= 3) return { icon: '✅', text: 'ROI excelente — Compra estratégica' };
-  if (cph <= 7) return { icon: '🟡', text: 'ROI razoável — Aguarde promoção' };
-  return { icon: '🔴', text: 'ROI fraco — Espere -40%' };
+function verdict(cph) {
+  if (cph == null) return { icon: '⏳', text: 'Sem preço — adicione manualmente' };
+  if (cph <= 2)    return { icon: '✅', text: 'ROI excelente — Compra estratégica' };
+  if (cph <= 5)    return { icon: '🟡', text: 'ROI razoável — Aguarde promoção' };
+  return            { icon: '🔴', text: 'ROI fraco — Espere desconto' };
 }
 
-function CountdownWidget({ items }) {
-  const upcoming = items
-    .filter(w => w.releaseDate)
-    .map(w => {
-      const diff = new Date(w.releaseDate) - new Date();
-      const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-      return { ...w, daysLeft: days };
-    })
-    .filter(w => w.daysLeft >= 0)
-    .sort((a, b) => a.daysLeft - b.daysLeft);
-
-  if (upcoming.length === 0) return null;
+// ── Card de jogo pequeno ────────────────────────────────────
+function GameCard({ title, cover, genre, ttbMain, price, pricePaid, mc, steamAppId, source }) {
+  const cph    = computeROI(price ?? pricePaid, ttbMain);
+  const v      = verdict(cph);
+  const imgSrc = cover ?? (steamAppId ? steamImg(steamAppId) : null);
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div className="section-hd" style={{ marginBottom: 12 }}>LANÇAMENTOS DA WISHLIST</div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        {upcoming.map(w => (
-          <div key={w.id} style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            padding: '10px 14px',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
-            borderLeft: `2px solid ${w.daysLeft <= 30 ? 'var(--accent)' : 'var(--border-hi)'}`,
-            borderRadius: 'var(--radius)',
-            minWidth: 200,
-          }}>
-            <div style={{
-              textAlign: 'center',
-              fontFamily: 'var(--font-mono)',
-              minWidth: 48,
-            }}>
-              <div style={{
-                fontSize: 22, fontWeight: 700,
-                color: w.daysLeft <= 30 ? 'var(--accent)' : 'var(--text-primary)',
-              }}>
-                {w.daysLeft}
-              </div>
-              <div style={{ fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.08em' }}>DIAS</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>{w.emoji} {w.title}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>
-                {new Date(w.releaseDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
-              </div>
-            </div>
+    <div style={{
+      background: 'var(--bg-card)',
+      border: '1px solid var(--border)',
+      display: 'flex',
+      flexDirection: 'column',
+    }}>
+      {/* Imagem 25% menor: 147px × 69px (antes ~195×92) */}
+      {imgSrc ? (
+        <img
+          src={imgSrc}
+          alt={title}
+          style={{ width: '100%', height: 69, objectFit: 'cover', display: 'block', borderBottom: '1px solid var(--border)' }}
+          onError={e => { e.target.style.display = 'none'; }}
+        />
+      ) : (
+        <div style={{ height: 69, background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, borderBottom: '1px solid var(--border)' }}>
+          🎮
+        </div>
+      )}
+
+      <div style={{ padding: '10px 10px 8px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Título + Gênero */}
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+            {title.length > 22 ? title.slice(0, 22) + '…' : title}
           </div>
-        ))}
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+            {genre ?? 'Steam'}{ttbMain ? ` · ${ttbMain}h` : ''}
+            {mc ? ` · MC:${mc}` : ''}
+          </div>
+        </div>
+
+        {/* Preço + CPH */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+            {(price ?? pricePaid) != null ? `R$${(price ?? pricePaid).toFixed(0)}` : <span style={{ color: 'var(--yellow)' }}>R$--</span>}
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: cphColor(cph) }}>
+            {cph != null ? `R$${cph.toFixed(2)}/h` : '-- /h'}
+          </div>
+        </div>
+
+        {/* Veredito */}
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-secondary)', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+          {v.icon} {v.text}
+        </div>
+
+        {/* Link SteamDB */}
+        {steamAppId && (
+          <a
+            href={`https://steamdb.info/app/${steamAppId}/`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--accent)', marginTop: 2 }}
+          >
+            → SteamDB
+          </a>
+        )}
       </div>
     </div>
   );
 }
 
-export default function SmartBuyV2({ wishlist }) {
-  const [sortBy, setSortBy] = useState('roi');
-  const [view,   setView]   = useState('market'); // 'market' | 'wishlist'
+// ── Componente principal ────────────────────────────────────
+export default function SmartBuyV2({ games = [], wishlist = [] }) {
+  const [tab, setTab] = useState('library');
 
-  const market = useMemo(() => {
-    return [...wishlist]
-      .filter(g => !g.unreleased && g.currentPrice != null)
+  // Biblioteca do usuário com ROI calculado
+  const libraryWithROI = useMemo(() =>
+    [...games]
       .map(g => ({
         ...g,
-        cph: g.isFree ? 0 : computeROI(g.currentPrice, g.ttbMain),
-        savings: g.historicLow != null ? (g.currentPrice - g.historicLow) : null,
+        cph: computeROI(g.pricePaid ?? g.price, g.ttbMain),
       }))
-      .sort((a, b) => {
-        if (sortBy === 'roi')   return (a.cph ?? 999) - (b.cph ?? 999);
-        if (sortBy === 'price') return (a.currentPrice ?? 999) - (b.currentPrice ?? 999);
-        return (b.rating ?? 0) - (a.rating ?? 0);
-      });
-  }, [wishlist, sortBy]);
+      .sort((a, b) => (a.cph ?? 999) - (b.cph ?? 999)),
+    [games]
+  );
+
+  // Recomendações com ROI
+  const recsWithROI = useMemo(() =>
+    RECOMMENDED
+      .filter(r => !games.find(g => g.steamAppId === r.appId)) // Filtra o que já tem na biblioteca
+      .map(r => ({ ...r, cph: computeROI(r.price, r.ttbMain) }))
+      .sort((a, b) => (a.cph ?? 999) - (b.cph ?? 999)),
+    [games]
+  );
+
+  const TABS = [
+    { id: 'library',  label: '◈ Minha Biblioteca', count: libraryWithROI.length },
+    { id: 'recs',     label: '↗ Recomendações',    count: recsWithROI.length },
+  ];
+
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))',
+    gap: 10,
+  };
 
   return (
     <div className="fade-in">
@@ -105,209 +154,91 @@ export default function SmartBuyV2({ wishlist }) {
           <div className="page-title">Compra Inteligente</div>
           <div className="page-subtitle">ROI DE LAZER — CUSTO POR HORA DE DIVERSÃO</div>
         </div>
-        <div className="page-actions">
-          <button
-            className={`chip ${view === 'market' ? 'active' : ''}`}
-            onClick={() => setView('market')}
-          >
-            📊 Mercado
-          </button>
-          <button
-            className={`chip ${view === 'wishlist' ? 'active' : ''}`}
-            onClick={() => setView('wishlist')}
-          >
-            ⭐ Wishlist
-          </button>
-        </div>
       </div>
 
       <div style={{ padding: '20px 28px' }}>
-        {/* Launch Countdown */}
-        <CountdownWidget items={wishlist} />
+        {/* Benchmark bar */}
+        <div style={{
+          padding: '9px 14px', marginBottom: 16,
+          background: 'var(--bg-card)', border: '1px solid var(--border)',
+          borderLeft: '2px solid var(--accent)',
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap',
+          color: 'var(--text-secondary)',
+        }}>
+          <span style={{ color: 'var(--accent)' }}>// BENCHMARK</span>
+          <span><span style={{ color: 'var(--green-bright)' }}>≤R$3/h</span> = Excelente</span>
+          <span><span style={{ color: 'var(--yellow)' }}>R$3–7/h</span> = Razoável</span>
+          <span><span style={{ color: 'var(--red)' }}>&gt;R$7/h</span> = Ineficiente</span>
+          <span style={{ color: 'var(--text-muted)' }}>Netflix ≈ R$1,80/h</span>
+        </div>
 
-        {view === 'market' && (
-          <>
-            {/* Sort */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>ORDENAR:</span>
-              {SORT_OPTIONS.map(s => (
-                <button
-                  key={s.id}
-                  className={`chip ${sortBy === s.id ? 'active' : ''}`}
-                  onClick={() => setSortBy(s.id)}
-                >
-                  {s.label}
-                </button>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              className={`chip ${tab === t.id ? 'active' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+              {t.count > 0 && (
+                <span style={{
+                  marginLeft: 5, fontFamily: 'var(--font-mono)', fontSize: 9,
+                  background: 'var(--bg-root)', padding: '1px 5px',
+                }}>
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Aba: Minha Biblioteca */}
+        {tab === 'library' && (
+          libraryWithROI.length === 0 ? (
+            <div style={{
+              textAlign: 'center', padding: '60px 20px',
+              fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', fontSize: 11,
+            }}>
+              [BIBLIOTECA VAZIA]<br />
+              <span style={{ fontSize: 10, marginTop: 8, display: 'block' }}>
+                // Sincronize a Steam para ver sua biblioteca com análise de ROI
+              </span>
+            </div>
+          ) : (
+            <div style={gridStyle}>
+              {libraryWithROI.map(g => (
+                <GameCard key={g.id} {...g} price={g.pricePaid ?? g.price} />
               ))}
             </div>
-
-            {/* ROI Benchmark */}
-            <div style={{
-              padding: '10px 14px', marginBottom: 16,
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border)',
-              borderLeft: '2px solid var(--accent)',
-              borderRadius: 'var(--radius)',
-              display: 'flex', alignItems: 'center', gap: 12,
-            }}>
-              <span style={{ fontSize: 14 }}>💡</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600 }}>
-                  Custo/Hora de Lazer = Preço ÷ Horas HLTB
-                </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {`R$3/h `}{`= Excelente`}&nbsp;·&nbsp;{`R$3–7/h = Razoável`}&nbsp;·&nbsp;{`> R$7/h = Ineficiente`}&nbsp;·&nbsp;Netflix ≈ R$1,80/h = benchmark
-                </div>
-              </div>
-            </div>
-
-            {/* Market Grid */}
-            <div className="wishlist-grid">
-              {market.map(game => {
-                const v = verdict(game.cph, game.isFree);
-                const cc = cphColor(game.cph);
-                const isHistLow = game.isHistLow || (game.historicLow && game.currentPrice <= game.historicLow);
-
-                return (
-                  <div className="wl-card" key={game.id} style={{
-                    backgroundImage: game.cover ? `url(${game.cover})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    position: 'relative',
-                  }}>
-                    {/* Cover overlay */}
-                    {game.cover && (
-                      <div style={{
-                        position: 'absolute', inset: 0,
-                        background: 'rgba(10,10,10,0.88)',
-                        borderRadius: 'var(--radius)',
-                      }} />
-                    )}
-                    <div style={{ position: 'relative', zIndex: 1 }}>
-                      {isHistLow && <div className="hist-low">⬇ MÍN. HISTÓRICO</div>}
-
-                      <div className="wl-head">
-                        <div className="wl-ico">{game.emoji}</div>
-                        <div style={{ flex: 1 }}>
-                          <div className="wl-title">{game.title}</div>
-                          <div className="wl-genre">{game.genre}</div>
-                        </div>
-                      </div>
-
-                      <div className="roi-row">
-                        <div className="roi-cell">
-                          <div className="roi-cell-label">PREÇO ATUAL</div>
-                          <div className="roi-cell-val" style={{ color: isHistLow ? 'var(--green-bright)' : 'var(--text-primary)' }}>
-                            {game.isFree ? 'GRÁTIS' : `R$${game.currentPrice?.toFixed(0)}`}
-                          </div>
-                        </div>
-                        <div className="roi-cell">
-                          <div className="roi-cell-label">DURAÇÃO</div>
-                          <div className="roi-cell-val">{game.ttbMain}h</div>
-                        </div>
-                        <div className="roi-cell">
-                          <div className="roi-cell-label">METACRITIC</div>
-                          <div className="roi-cell-val" style={{
-                            color: game.rating >= 90 ? 'var(--green-bright)' : game.rating >= 75 ? 'var(--yellow)' : 'var(--text-muted)',
-                          }}>
-                            {game.rating ?? '—'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="cph-row">
-                        <div className="cph-label">CUSTO / HORA</div>
-                        <div className="cph-val" style={{ color: cc }}>
-                          {game.isFree ? 'R$ 0,00 / h' : game.cph != null ? `R$ ${game.cph.toFixed(2)} / h` : '—'}
-                        </div>
-                      </div>
-
-                      <div className="roi-verdict">{v.icon} <span>{v.text}</span></div>
-
-                      {game.historicLow != null && !isHistLow && (
-                        <div className="hist-note">
-                          <span>Mín. histórico:</span>
-                          <span style={{ color: 'var(--green-bright)' }}>R${game.historicLow.toFixed(0)}</span>
-                        </div>
-                      )}
-
-                      <div className="wl-actions">
-                        <button className="btn">🛒 Comprar</button>
-                        <button className="btn btn-ghost">🔔 Alertar</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
+          )
         )}
 
-        {view === 'wishlist' && (
-          <WishlistPanel wishlist={wishlist} />
+        {/* Aba: Recomendações */}
+        {tab === 'recs' && (
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', marginBottom: 12 }}>
+              // Seleção curada por ROI · Jogos que você ainda NÃO tem na biblioteca
+            </div>
+            <div style={gridStyle}>
+              {recsWithROI.map(r => (
+                <GameCard
+                  key={r.id}
+                  title={r.title}
+                  cover={steamImg(r.appId)}
+                  genre={r.genre}
+                  ttbMain={r.ttbMain}
+                  price={r.price}
+                  mc={r.mc}
+                  steamAppId={r.appId}
+                />
+              ))}
+            </div>
+          </div>
         )}
 
         <div style={{ height: 28 }} />
-      </div>
-    </div>
-  );
-}
-
-function WishlistPanel({ wishlist }) {
-  return (
-    <div>
-      <div className="section-hd" style={{ marginBottom: 12 }}>LISTA DE DESEJOS</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {wishlist.map(w => {
-          const isRecommended = w.isHistLow || (w.historicLow && w.currentPrice <= w.historicLow);
-          const cph = w.isFree ? 0 : computeROI(w.currentPrice, w.ttbMain);
-
-          return (
-            <div key={w.id} style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              padding: '12px 14px',
-              background: 'var(--bg-card)',
-              border: `1px solid ${isRecommended ? 'var(--accent)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius)',
-              position: 'relative',
-              animation: isRecommended ? 'wishlist-pulse 2s ease infinite' : 'none',
-            }}>
-              {isRecommended && (
-                <div style={{
-                  position: 'absolute', top: -1, right: 10,
-                  fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 700,
-                  color: 'var(--accent)', letterSpacing: '0.1em',
-                  background: 'var(--bg-card)', padding: '2px 6px',
-                  border: '1px solid var(--accent)', borderTop: 'none',
-                }}>
-                  ⚡ COMPRA RECOMENDADA
-                </div>
-              )}
-              <div style={{ fontSize: 20 }}>{w.emoji}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{w.title}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {w.genre} · {w.ttbMain}h main
-                  {w.releaseDate ? ` · 🚀 ${new Date(w.releaseDate).toLocaleDateString('pt-BR')}` : ''}
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700, color: isRecommended ? 'var(--green-bright)' : 'var(--text-primary)' }}>
-                  {w.isFree ? 'GRÁTIS' : w.currentPrice ? `R$${w.currentPrice.toFixed(0)}` : w.unreleased ? 'A LANÇAR' : '—'}
-                </div>
-                {cph != null && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: cph <= 3 ? 'var(--green-bright)' : cph <= 7 ? 'var(--yellow)' : 'var(--red)' }}>
-                    R${cph.toFixed(2)}/h
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <button className="btn btn-ghost" style={{ fontSize: 11 }}>🔔</button>
-                {w.currentPrice && <button className="btn" style={{ fontSize: 11 }}>🛒 Comprar</button>}
-              </div>
-            </div>
-          );
-        })}
       </div>
     </div>
   );

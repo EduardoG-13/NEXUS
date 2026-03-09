@@ -1,5 +1,6 @@
 // Settings Page — Configurações
 import { useState } from 'react';
+import { clearAllMemories, isSupermemoryConfigured } from '../services/supermemoryService';
 
 const PLATFORMS_OPTS = [
   { id: 'steam',       label: 'Steam',       icon: '🎮' },
@@ -29,6 +30,7 @@ export default function Settings({ profile, onSave }) {
   const [theme,     setTheme]     = useState(profile.theme || 'dark');
   const [hltbPref,  setHltbPref]  = useState(profile.hltbPref || 'main');
   const [saved,     setSaved]     = useState(false);
+  const [clearing,  setClearing]  = useState(false);
 
   function togglePlatform(id) {
     setPlatforms(prev =>
@@ -41,6 +43,34 @@ export default function Settings({ profile, onSave }) {
     setSaved(true);
     onSave({ name, avatar: name.charAt(0).toUpperCase(), platforms, theme, hltbPref });
     setTimeout(() => setSaved(false), 2500);
+  }
+
+  function handleExportLibrary() {
+    const games = JSON.parse(localStorage.getItem('bb_games') || '[]');
+    const blob  = new Blob([JSON.stringify(games, null, 2)], { type: 'application/json' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href      = url;
+    a.download  = `nexus_biblioteca_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleClearAllData() {
+    const confirmed = window.confirm(
+      '⚠️ ATENÇÃO\n\nIsso irá apagar TODOS os seus dados locais e memórias na Supermemory.\n\nEssa ação é irreversível. Continuar?'
+    );
+    if (!confirmed) return;
+    setClearing(true);
+    try {
+      if (isSupermemoryConfigured()) await clearAllMemories();
+      localStorage.clear();
+      window.location.reload();
+    } catch (err) {
+      console.error('Erro ao limpar dados:', err);
+      localStorage.clear();
+      window.location.reload();
+    }
   }
 
   return (
@@ -196,28 +226,41 @@ export default function Settings({ profile, onSave }) {
 
           {/* Dados */}
           <div className="settings-card" style={{ gridColumn: 'span 2' }}>
-            <div  className="settings-card-title">// DADOS E PRIVACIDADE</div>
+            <div className="settings-card-title">// DADOS E PRIVACIDADE</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', marginBottom: 12 }}>
+              // Privacy by Design — minimização de dados e controle total do usuário.
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[
-                { label: 'EXPORTAR BIBLIOTECA', desc: 'JSON com todos os seus dados', action: 'Exportar .json' },
-                { label: 'RESETAR BACKLOG', desc: 'Remove todos os jogos queimados', action: 'Resetar', danger: true },
-                { label: 'RECONECTAR STEAM', desc: 'Refaz sincronização completa', action: 'Reconectar' },
-              ].map(item => (
-                <div key={item.label} style={{
-                  background: 'var(--bg-root)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 2,
-                  padding: '12px',
-                }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 4 }}>
-                    {item.label}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>{item.desc}</div>
-                  <button className={`btn ${item.danger ? 'btn-danger' : ''}`} style={{ fontSize: 11 }}>
-                    {item.action}
-                  </button>
+              {/* Exportar */}
+              <div style={{ background: 'var(--bg-root)', border: '1px solid var(--border)', borderRadius: 2, padding: '12px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 4 }}>EXPORTAR BIBLIOTECA</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>Baixa um .json com todos os seus jogos e dados locais.</div>
+                <button className="btn" style={{ fontSize: 11 }} onClick={handleExportLibrary} id="btn-export-library">Exportar .json</button>
+              </div>
+              {/* Supermemory status */}
+              <div style={{ background: 'var(--bg-root)', border: '1px solid var(--border)', borderRadius: 2, padding: '12px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', letterSpacing: '0.1em', marginBottom: 4 }}>SUPERMEMORY RAG</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                  {isSupermemoryConfigured() ? 'Memória de IA ativa. Histórico salvo na nuvem.' : 'Inativo — configure VITE_SUPERMEMORY_API_KEY no .env.'}
                 </div>
-              ))}
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, padding: '4px 8px', background: isSupermemoryConfigured() ? 'var(--green-dim)' : 'var(--bg-elevated)', color: isSupermemoryConfigured() ? 'var(--green-bright)' : 'var(--text-muted)', border: `1px solid ${isSupermemoryConfigured() ? 'var(--green-border)' : 'var(--border-hi)'}`, borderRadius: 2, display: 'inline-block' }}>
+                  {isSupermemoryConfigured() ? '● ONLINE' : '○ OFFLINE'}
+                </div>
+              </div>
+              {/* Limpar tudo */}
+              <div style={{ background: 'var(--bg-root)', border: '1px solid #3f1515', borderRadius: 2, padding: '12px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: '#DC2626', letterSpacing: '0.1em', marginBottom: 4 }}>LIMPAR TODOS OS DADOS</div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10 }}>Apaga localStorage e memórias Supermemory. Irreversível.</div>
+                <button
+                  className="btn btn-danger"
+                  style={{ fontSize: 11 }}
+                  onClick={handleClearAllData}
+                  disabled={clearing}
+                  id="btn-clear-all-data"
+                >
+                  {clearing ? '⟳ Limpando...' : '🗑 Apagar Tudo'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

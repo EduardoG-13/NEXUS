@@ -87,11 +87,21 @@ export default function Library({ games, onBurn, onAddGame }) {
         {visible.length === 0 ? (
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', padding: '60px 20px', gap: 8, textAlign: 'center',
+            justifyContent: 'center', padding: '60px 20px', gap: 12, textAlign: 'center',
           }}>
-            <div style={{ fontSize: 28, opacity: 0.3 }}>🕹️</div>
-            <div style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Nenhum jogo encontrado</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Ajuste os filtros ou adicione novos títulos.</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, color: 'var(--text-muted)', letterSpacing: '0.1em' }}>
+              [BIBLIOTECA VAZIA]
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+              {games.length === 0
+                ? '// Sincronize sua conta Steam para carregar seus jogos.\n// Ou adicione um jogo manualmente com o botão acima.'
+                : '// Nenhum jogo encontrado com os filtros atuais.'}
+            </div>
+            {games.length === 0 && (
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)', border: '1px solid var(--border-hi)', padding: '8px 14px' }}>
+                ○ Steam não sincronizado
+              </div>
+            )}
           </div>
         ) : (
           <table className="g-table">
@@ -115,19 +125,38 @@ export default function Library({ games, onBurn, onAddGame }) {
                 >
                   <td>
                     <div className="g-title-wrap">
-                      <div className="g-cover">{game.emoji}</div>
+                      {/* Capa: imagem Steam CDN se disponível, emoji caso contrário */}
+                      {game.cover ? (
+                        <img
+                          src={game.cover}
+                          alt={game.title}
+                          className="g-cover-img"
+                          onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                        />
+                      ) : null}
+                      <div className="g-cover" style={{ display: game.cover ? 'none' : 'flex' }}>{game.emoji}</div>
                       <div>
                         <div className="g-name">{game.title}</div>
-                        <div className="g-platform">{game.platform}</div>
+                        <div className="g-platform">{game.platform}{game.hoursPlayed != null ? ` · ${game.hoursPlayed}h jogadas` : ''}</div>
                       </div>
                     </div>
                   </td>
                   <td>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{game.genre}</span>
                   </td>
-                  <td><span className="g-mono">{game.ttbMain}h</span></td>
-                  <td><span className="g-mono dim">{game.ttbFull}h</span></td>
-                  <td><span className="g-mono dim">R${(game.pricePaid ?? game.price ?? 0).toFixed(0)}</span></td>
+                  <td><span className="g-mono">
+                    {game.ttbMain ? `${game.ttbMain}h` : <span style={{ color: 'var(--text-muted)' }}>--h</span>}
+                  </span></td>
+                  <td><span className="g-mono dim">
+                    {game.ttbFull ? `${game.ttbFull}h` : <span style={{ color: 'var(--text-muted)' }}>--h</span>}
+                  </span></td>
+                  <td>
+                    <span className="g-mono dim">
+                      {(game.pricePaid ?? game.price) != null
+                        ? `R$${(game.pricePaid ?? game.price).toFixed(0)}`
+                        : <span style={{ color: 'var(--yellow)' }}>R$--</span>}
+                    </span>
+                  </td>
                   <td>
                     <span className="g-mono" style={{
                       color: game.metacritic >= 90 ? 'var(--green-bright)'

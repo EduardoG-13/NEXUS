@@ -3,6 +3,7 @@ import './index.css';
 import { GAMES_DEFAULT, WISHLIST_DEFAULT } from './data';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { ToastProvider, useToast } from './components/ToastSystem';
+import { saveMemory } from './services/supermemoryService';
 
 import LoginPage         from './views/LoginPage';
 import SyncPage          from './views/SyncPage';
@@ -64,11 +65,31 @@ function InnerApp() {
   const [burnToasts,   setBurnToasts]   = useState([]);
   const [showFlash,    setShowFlash]    = useState(false);
 
-  // ─── Auth ────────────────────────────
+  // ─── Auth ────────────────────
   function handleLogin(method) { setLoginMethod(method); setAppState('sync'); }
-  function handleSyncComplete() { setAppState('app'); }
+  function handleSyncComplete(steamGames, steamProfile) {
+    // Atualiza perfil com o nome Steam real
+    if (steamProfile?.name) {
+      setProfile(prev => ({
+        ...prev,
+        name:      steamProfile.name,
+        avatarUrl: steamProfile.avatarUrl ?? prev.avatarUrl,
+        avatar:    steamProfile.name.slice(0, 2).toUpperCase(),
+        steamId:   steamProfile.steamId,
+      }));
+    }
+    // Merge de jogos Steam sem duplicar
+    if (steamGames && steamGames.length > 0) {
+      setGames(prev => {
+        const existingIds = new Set(prev.map(g => g.id));
+        const newGames    = steamGames.filter(g => !existingIds.has(g.id));
+        return [...newGames, ...prev];
+      });
+    }
+    setAppState('app');
+  }
 
-  // ─── BURN ────────────────────────────
+  // ─── BURN ────────────────────
   const handleBurn = useCallback((id) => {
     const game = games.find(g => g.id === id);
     setGames(prev => prev.filter(g => g.id !== id));
@@ -79,6 +100,13 @@ function InnerApp() {
     setBurnToasts(prev => [...prev, { id: tid }]);
     setTimeout(() => setBurnToasts(prev => prev.filter(t => t.id !== tid)), 2100);
     push('burn', `🔥 "${game?.title ?? 'Jogo'}" queimado · Backlog Score +5pts`);
+    // Salva o evento no gráfico de conhecimento do gamer
+    if (game) {
+      saveMemory(
+        `Jogador queimou (descartou) o jogo: "${game.title}". Gênero: ${game.genre ?? 'Desconhecido'}. HLTB: ${game.ttbMain}h. Motivo: decisão deliberada.`,
+        { type: 'burn_event', gameId: game.id }
+      );
+    }
   }, [games, push, setGames]);
 
   const handleScoreBonusUsed = useCallback(() => setScoreBonus(0), []);
@@ -216,7 +244,7 @@ function InnerApp() {
           {view === 'library' && (
             <Library games={games} onBurn={handleBurn} onAddGame={() => setShowModal(true)} />
           )}
-          {view === 'smartbuy'  && <SmartBuyV2 wishlist={wishlist} />}
+          {view === 'smartbuy'  && <SmartBuyV2 games={games} wishlist={wishlist} />}
           {view === 'calendar'  && (
             <TacticalCalendar
               games={games}
