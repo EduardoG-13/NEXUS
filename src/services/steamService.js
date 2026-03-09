@@ -3,7 +3,17 @@
 // ============================================================
 
 const STEAM_API_KEY = import.meta.env.VITE_STEAM_API_KEY;
-const CORS_PROXY    = 'https://api.allorigins.win/raw?url=';
+
+// Lista de proxies CORS para fallback de segurança em produção
+const CORS_PROXIES = [
+  // 1: AllOrigins (via Fetch API / JSONP)
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  // 2: Thingproxy (Simples, robusto)
+  url => `https://thingproxy.freeboard.io/fetch/${url}`,
+  // 3: Corsproxy.io (Original)
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+];
+
 const CACHE_KEY     = 'nexus_steam_cache';
 const CACHE_TTL_MS  = 1000 * 60 * 60 * 6; // 6 horas
 
@@ -12,6 +22,23 @@ export function steamHeader(appId) {
   return appId
     ? `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`
     : null;
+}
+
+// ── Fetch robusto com fallback ────────────────────────────────
+async function fetchWithProxy(targetUrl) {
+  let lastError;
+  for (const proxyFn of CORS_PROXIES) {
+    try {
+      const proxiedUrl = proxyFn(targetUrl);
+      const res = await fetch(proxiedUrl, { headers: { 'x-requested-with': 'XMLHttpRequest' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      lastError = err;
+      console.warn(`[steamService proxy fallback] Falhou: ${err.message}. Tentando próximo...`);
+    }
+  }
+  throw lastError || new Error('All CORS proxies failed');
 }
 
 // ── Cache helpers ───────────────────────────────────────────
@@ -116,16 +143,10 @@ export async function fetchSteamGames(steamId, forceRefresh = false) {
   }
 
   try {
-    const steamUrl   = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_API_KEY}&steamid=${id}&include_appinfo=true&include_played_free_games=true&format=json`;
-    const proxiedUrl = `${CORS_PROXY}${encodeURIComponent(steamUrl)}`;
-
-    const response = await fetch(proxiedUrl, {
-      headers: { 'x-requested-with': 'XMLHttpRequest' },
-    });
-
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const data = await response.json();
+    const steamUrl = `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_API_KEY}&steamid=${id}&include_appinfo=true&include_played_free_games=true&format=json`;
+    
+    // Agora usando a função wrapper que tenta até 3 proxies caso o primeiro dê bloqueio de preflight (CORS)
+    const data = await fetchWithProxy(steamUrl);
     const raw  = data?.response?.games ?? [];
 
     if (raw.length === 0) {
@@ -162,11 +183,7 @@ export async function fetchSteamProfile(steamId) {
   if (!STEAM_API_KEY || !steamId?.trim()) return null;
   try {
     const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_API_KEY}&steamids=${steamId.trim()}&format=json`;
-    const res = await fetch(`${CORS_PROXY}${encodeURIComponent(url)}`, {
-      headers: { 'x-requested-with': 'XMLHttpRequest' },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await fetchWithProxy(url);
     const player = data?.response?.players?.[0];
     if (!player) return null;
     return {
