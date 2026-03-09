@@ -4,14 +4,11 @@
 
 const STEAM_API_KEY = import.meta.env.VITE_STEAM_API_KEY;
 
-// Lista de proxies CORS para fallback de segurança em produção
+// URLs limpas sem headers restritivos
 const CORS_PROXIES = [
-  // 1: AllOrigins (via Fetch API / JSONP)
   url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  // 2: Thingproxy (Simples, robusto)
   url => `https://thingproxy.freeboard.io/fetch/${url}`,
-  // 3: Corsproxy.io (Original)
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` // Proxy extra sem auth
 ];
 
 const CACHE_KEY     = 'nexus_steam_cache';
@@ -181,6 +178,8 @@ export async function fetchSteamGames(steamId, forceRefresh = false) {
  */
 export async function fetchSteamProfile(steamId) {
   if (!STEAM_API_KEY || !steamId?.trim()) return null;
+  
+  // Tenta fetch direto via proxy
   try {
     const url = `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_API_KEY}&steamids=${steamId.trim()}&format=json`;
     const data = await fetchWithProxy(url);
@@ -192,11 +191,11 @@ export async function fetchSteamProfile(steamId) {
       steamId:   steamId.trim(),
     };
   } catch (err) {
-    console.warn('[steamService] fetchSteamProfile falhou:', err.message);
+    console.warn('[steamService] fetchSteamProfile falhou via fetch, nome pode não aparecer:', err.message);
     return null;
   }
 }
 
 export function isSteamConfigured() {
-  return Boolean(STEAM_API_KEY);
+  return Boolean(STEAM_API_KEY && STEAM_API_KEY.length > 10);
 }

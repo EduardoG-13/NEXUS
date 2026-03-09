@@ -8,8 +8,8 @@ import { useState, useMemo } from 'react';
 import { computeROI } from '../data';
 
 // ── Lista curada de jogos recomendados para compra ──────────
-// Fonte: Steam CDN público (sem API key). Preços em BRL.
-const RECOMMENDED = [
+// Uma lista mais robusta para sortear recomendações diárias/rotativas
+const CATALOG = [
   { id: 'r1',  title: 'Elden Ring',           appId: 1245620, genre: 'Action RPG',     price: 189.90, ttbMain: 55,  mc: 96  },
   { id: 'r2',  title: "Baldur's Gate 3",      appId: 1086940, genre: 'RPG',            price: 199.90, ttbMain: 100, mc: 96  },
   { id: 'r3',  title: 'Hollow Knight',        appId: 367520,  genre: 'Metroidvania',   price: 14.90,  ttbMain: 25,  mc: 90  },
@@ -17,12 +17,24 @@ const RECOMMENDED = [
   { id: 'r5',  title: 'Disco Elysium',        appId: 632470,  genre: 'RPG',            price: 29.90,  ttbMain: 22,  mc: 91  },
   { id: 'r6',  title: 'Celeste',              appId: 504230,  genre: 'Plataforma',     price: 19.90,  ttbMain: 9,   mc: 94  },
   { id: 'r7',  title: 'Portal 2',             appId: 620,     genre: 'Puzzle',         price: 9.90,   ttbMain: 9,   mc: 95  },
-  { id: 'r8',  title: 'Sekiro',              appId: 814380,  genre: 'Action',         price: 149.90, ttbMain: 30,  mc: 91  },
+  { id: 'r8',  title: 'Sekiro',               appId: 814380,  genre: 'Action',         price: 149.90, ttbMain: 30,  mc: 91  },
   { id: 'r9',  title: 'Cyberpunk 2077',       appId: 1091500, genre: 'Action RPG',     price: 89.90,  ttbMain: 28,  mc: 86  },
-  { id: 'r10', title: 'Ori Will of Wisps',   appId: 1057090, genre: 'Metroidvania',   price: 39.90,  ttbMain: 9,   mc: 93  },
+  { id: 'r10', title: 'Ori Will of Wisps',    appId: 1057090, genre: 'Metroidvania',   price: 39.90,  ttbMain: 9,   mc: 93  },
   { id: 'r11', title: 'Returnal',             appId: 1649240, genre: 'Roguelike',      price: 179.90, ttbMain: 25,  mc: 86  },
   { id: 'r12', title: 'God of War',           appId: 1593500, genre: 'Action',         price: 119.90, ttbMain: 21,  mc: 94  },
+  { id: 'r13', title: 'Stardew Valley',       appId: 413150,  genre: 'Simulation',     price: 24.90,  ttbMain: 52,  mc: 89  },
+  { id: 'r14', title: 'Terraria',             appId: 105600,  genre: 'Sandbox',        price: 19.90,  ttbMain: 50,  mc: 83  },
+  { id: 'r15', title: 'Red Dead Redemption 2',appId: 1174180, genre: 'Open World',     price: 119.90, ttbMain: 50,  mc: 97  },
+  { id: 'r16', title: 'Valheim',              appId: 892970,  genre: 'Survival',       price: 37.90,  ttbMain: 73,  mc: 0   },
+  { id: 'r17', title: 'Dredge',               appId: 1562430, genre: 'Adventure',      price: 49.90,  ttbMain: 9,   mc: 80  },
+  { id: 'r18', title: 'Slay the Spire',       appId: 646570,  genre: 'Deckbuilder',    price: 46.90,  ttbMain: 45,  mc: 89  },
 ];
+
+// Seed generator para rotacionar jogos baseados no dia
+function getDailySeed() {
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
 
 function steamImg(appId) {
   return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
@@ -127,18 +139,32 @@ export default function SmartBuyV2({ games = [], wishlist = [] }) {
     [games]
   );
 
-  // Recomendações com ROI
-  const recsWithROI = useMemo(() =>
-    RECOMMENDED
-      .filter(r => !games.find(g => g.steamAppId === r.appId)) // Filtra o que já tem na biblioteca
+  // Recomendações com ROI (Rotacionadas por Dia)
+  const recsWithROI = useMemo(() => {
+    // 1. Filtra jogos que o usuário VAZIO tem
+    const notOwned = CATALOG.filter(r => !games.find(g => g.steamAppId === r.appId));
+    
+    // 2. Embaralha com uma seed baseada no dia + quantidade de jogos na biblioteca
+    // Isso garante que se ele comprar algo novo, as recomendações dão um shuffle
+    const seed = getDailySeed() + games.length;
+    
+    // Shuffle determinístico
+    let shuffled = [...notOwned];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = (seed * (i + 1)) % (i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    // 3. Pega os top 6 ou 8 para não inundar e calcula CPH
+    return shuffled
+      .slice(0, 8)
       .map(r => ({ ...r, cph: computeROI(r.price, r.ttbMain) }))
-      .sort((a, b) => (a.cph ?? 999) - (b.cph ?? 999)),
-    [games]
-  );
+      .sort((a, b) => (a.cph ?? 999) - (b.cph ?? 999));
+  }, [games]);
 
   const TABS = [
     { id: 'library',  label: '◈ Minha Biblioteca', count: libraryWithROI.length },
-    { id: 'recs',     label: '↗ Recomendações',    count: recsWithROI.length },
+    { id: 'recs',     label: '↗ Loja Oculta (Oráculo)', count: recsWithROI.length },
   ];
 
   const gridStyle = {
@@ -218,8 +244,8 @@ export default function SmartBuyV2({ games = [], wishlist = [] }) {
         {/* Aba: Recomendações */}
         {tab === 'recs' && (
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-muted)', marginBottom: 12 }}>
-              // Seleção curada por ROI · Jogos que você ainda NÃO tem na biblioteca
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--accent)', marginBottom: 12 }}>
+              // Rotação NEXUS diária · Filtro Ativo: Excluindo {games.length} jogos já possuídos
             </div>
             <div style={gridStyle}>
               {recsWithROI.map(r => (
