@@ -3,7 +3,7 @@
 // ============================================================
 
 const STEAM_API_KEY = import.meta.env.VITE_STEAM_API_KEY;
-const CORS_PROXY    = 'https://corsproxy.io/?';
+const CORS_PROXY    = 'https://api.allorigins.win/raw?url=';
 const CACHE_KEY     = 'nexus_steam_cache';
 const CACHE_TTL_MS  = 1000 * 60 * 60 * 6; // 6 horas
 
