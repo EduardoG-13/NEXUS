@@ -106,3 +106,63 @@ export async function getOracleRecommendation(userMessage, context = {}) {
 export function isGroqConfigured() {
   return true;
 }
+
+// ── Nova Curadoria com Ofertas Reais (CheapShark) ───────────
+export async function curateOffers(userGames, topDeals) {
+  if (!topDeals || !topDeals.length) return [];
+  
+  const ctx = buildContext({ games: userGames, availMin: 60 });
+  const dealList = topDeals
+    .map((d, i) => `ID:${i} | ${d.title} | R$${d.price} (-${Math.round(d.savings)}%) | MC:${d.mc || 'N/A'}`)
+    .join('\n');
+  
+  const prompt = `Como um curador de ofertas focado no meu backlog e gosto:
+Revise meu perfil e escolha os 6 jogos mais alinhados dessas 30 ofertas Steam atuais.
+Retorne APENAS um array JSON de inteiros (o ID de cada oferta escolhida). Exemplo exato: [0, 5, 12, 17, 22, 29]
+
+[MEU CONTEXTO]
+${ctx}
+
+[OFERTAS STEAM DISPONÍVEIS]
+${dealList}`;
+
+  const messages = [
+    { role: 'system', content: 'Você é um JSON bot. Responda ESTRITAMENTE com um array JSON de 6 inteiros correspondentes aos IDs selecionados, mais nada.' },
+    { role: 'user', content: prompt }
+  ];
+
+  const parseOrFallback = (text) => {
+    try {
+      const match = text.match(/\[[\d\s,]+\]/);
+      if (match) {
+        const ids = JSON.parse(match[0]);
+        const curated = ids.map(id => topDeals[id]).filter(Boolean);
+        if (curated.length > 0) return curated.slice(0, 6);
+      }
+    } catch {}
+    return null;
+  };
+
+  try {
+    const raw = await callGroq(messages);
+    if (raw) {
+      const res = parseOrFallback(raw);
+      if (res) return res;
+    }
+  } catch (e) {
+    if (e.message !== 'SKIP_GROQ') console.warn('[groqService] curateOffers Groq falhou:', e.message);
+  }
+
+  try {
+    const raw = await callPollinations(messages);
+    if (raw) {
+      const res = parseOrFallback(raw);
+      if (res) return res;
+    }
+  } catch (e) {
+    console.warn('[groqService] curateOffers Pollinations falhou:', e.message);
+  }
+
+  // Fallback: retorna os 6 primeiros (com melhores deal ratings do CheapShark)
+  return topDeals.slice(0, 6);
+}

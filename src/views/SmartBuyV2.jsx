@@ -4,31 +4,12 @@
 // Aba 2: Recomendações (curada por gênero + ROI)
 // Images 25% menores vs versão anterior
 // ============================================================
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { computeROI } from '../data';
+import { getTopDeals } from '../services/cheapSharkService';
+import { curateOffers } from '../services/groqService';
 
-// ── Lista curada de jogos recomendados para compra ──────────
-// Uma lista mais robusta para sortear recomendações diárias/rotativas
-const CATALOG = [
-  { id: 'r1',  title: 'Elden Ring',           appId: 1245620, genre: 'Action RPG',     price: 189.90, ttbMain: 55,  mc: 96  },
-  { id: 'r2',  title: "Baldur's Gate 3",      appId: 1086940, genre: 'RPG',            price: 199.90, ttbMain: 100, mc: 96  },
-  { id: 'r3',  title: 'Hollow Knight',        appId: 367520,  genre: 'Metroidvania',   price: 14.90,  ttbMain: 25,  mc: 90  },
-  { id: 'r4',  title: 'Hades',                appId: 1145360, genre: 'Roguelike',      price: 34.90,  ttbMain: 22,  mc: 93  },
-  { id: 'r5',  title: 'Disco Elysium',        appId: 632470,  genre: 'RPG',            price: 29.90,  ttbMain: 22,  mc: 91  },
-  { id: 'r6',  title: 'Celeste',              appId: 504230,  genre: 'Plataforma',     price: 19.90,  ttbMain: 9,   mc: 94  },
-  { id: 'r7',  title: 'Portal 2',             appId: 620,     genre: 'Puzzle',         price: 9.90,   ttbMain: 9,   mc: 95  },
-  { id: 'r8',  title: 'Sekiro',               appId: 814380,  genre: 'Action',         price: 149.90, ttbMain: 30,  mc: 91  },
-  { id: 'r9',  title: 'Cyberpunk 2077',       appId: 1091500, genre: 'Action RPG',     price: 89.90,  ttbMain: 28,  mc: 86  },
-  { id: 'r10', title: 'Ori Will of Wisps',    appId: 1057090, genre: 'Metroidvania',   price: 39.90,  ttbMain: 9,   mc: 93  },
-  { id: 'r11', title: 'Returnal',             appId: 1649240, genre: 'Roguelike',      price: 179.90, ttbMain: 25,  mc: 86  },
-  { id: 'r12', title: 'God of War',           appId: 1593500, genre: 'Action',         price: 119.90, ttbMain: 21,  mc: 94  },
-  { id: 'r13', title: 'Stardew Valley',       appId: 413150,  genre: 'Simulation',     price: 24.90,  ttbMain: 52,  mc: 89  },
-  { id: 'r14', title: 'Terraria',             appId: 105600,  genre: 'Sandbox',        price: 19.90,  ttbMain: 50,  mc: 83  },
-  { id: 'r15', title: 'Red Dead Redemption 2',appId: 1174180, genre: 'Open World',     price: 119.90, ttbMain: 50,  mc: 97  },
-  { id: 'r16', title: 'Valheim',              appId: 892970,  genre: 'Survival',       price: 37.90,  ttbMain: 73,  mc: 0   },
-  { id: 'r17', title: 'Dredge',               appId: 1562430, genre: 'Adventure',      price: 49.90,  ttbMain: 9,   mc: 80  },
-  { id: 'r18', title: 'Slay the Spire',       appId: 646570,  genre: 'Deckbuilder',    price: 46.90,  ttbMain: 45,  mc: 89  },
-];
+// (Removido CATALOG estático)
 
 // Seed generator para rotacionar jogos baseados no dia
 function getDailySeed() {
@@ -127,6 +108,8 @@ function GameCard({ title, cover, genre, ttbMain, price, pricePaid, mc, steamApp
 // ── Componente principal ────────────────────────────────────
 export default function SmartBuyV2({ games = [], wishlist = [] }) {
   const [tab, setTab] = useState('library');
+  const [aiRecs, setAiRecs] = useState([]);
+  const [loadingTopDeals, setLoadingTopDeals] = useState(false);
 
   // Biblioteca do usuário com ROI calculado
   const libraryWithROI = useMemo(() =>
@@ -139,32 +122,28 @@ export default function SmartBuyV2({ games = [], wishlist = [] }) {
     [games]
   );
 
-  // Recomendações com ROI (Rotacionadas por Dia)
-  const recsWithROI = useMemo(() => {
-    // 1. Filtra jogos que o usuário VAZIO tem
-    const notOwned = CATALOG.filter(r => !games.find(g => g.steamAppId === r.appId));
-    
-    // 2. Embaralha com uma seed baseada no dia + quantidade de jogos na biblioteca
-    // Isso garante que se ele comprar algo novo, as recomendações dão um shuffle
-    const seed = getDailySeed() + games.length;
-    
-    // Shuffle determinístico
-    let shuffled = [...notOwned];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = (seed * (i + 1)) % (i + 1);
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  async function fetchCuratedDeals() {
+    setLoadingTopDeals(true);
+    try {
+      const deals = await getTopDeals();
+      const curated = await curateOffers(games, deals);
+      setAiRecs(curated.map(r => ({ ...r, cph: computeROI(r.price, 20) }))); // Assumindo media 20h para ROI inicial
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingTopDeals(false);
     }
-    
-    // 3. Pega os top 6 ou 8 para não inundar e calcula CPH
-    return shuffled
-      .slice(0, 8)
-      .map(r => ({ ...r, cph: computeROI(r.price, r.ttbMain) }))
-      .sort((a, b) => (a.cph ?? 999) - (b.cph ?? 999));
-  }, [games]);
+  }
+
+  useEffect(() => {
+    if (tab === 'recs' && aiRecs.length === 0) {
+      fetchCuratedDeals();
+    }
+  }, [tab]);
 
   const TABS = [
     { id: 'library',  label: '◈ Minha Biblioteca', count: libraryWithROI.length },
-    { id: 'recs',     label: '↗ Loja Oculta (Oráculo)', count: recsWithROI.length },
+    { id: 'recs',     label: '↗ Loja Oculta (Oráculo)', count: aiRecs.length },
   ];
 
   const gridStyle = {
@@ -244,23 +223,39 @@ export default function SmartBuyV2({ games = [], wishlist = [] }) {
         {/* Aba: Recomendações */}
         {tab === 'recs' && (
           <div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--accent)', marginBottom: 12 }}>
-              // Rotação NEXUS diária · Filtro Ativo: Excluindo {games.length} jogos já possuídos
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--accent)' }}>
+                // Rotação NEXUS · Curadoria de IA baseada na sua biblioteca Steam e descontos atuais (CheapShark API)
+              </div>
+              <button
+                onClick={fetchCuratedDeals}
+                className="btn btn-ghost"
+                disabled={loadingTopDeals}
+                style={{ fontSize: 10, padding: '4px 10px' }}
+              >
+                {loadingTopDeals ? '↻ Curando...' : '↻ Atualizar Curadoria'}
+              </button>
             </div>
-            <div style={gridStyle}>
-              {recsWithROI.map(r => (
-                <GameCard
-                  key={r.id}
-                  title={r.title}
-                  cover={steamImg(r.appId)}
-                  genre={r.genre}
-                  ttbMain={r.ttbMain}
-                  price={r.price}
-                  mc={r.mc}
-                  steamAppId={r.appId}
-                />
-              ))}
-            </div>
+            
+            {loadingTopDeals ? (
+              <div style={{ textAlign: 'center', padding: '40px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+                <span className="dot-live" style={{ background: 'var(--accent)' }}></span> O Oráculo está analisando as promoções...
+              </div>
+            ) : (
+              <div style={gridStyle}>
+                {aiRecs.map(r => (
+                  <GameCard
+                    key={r.appId || Math.random()}
+                    title={r.title}
+                    cover={r.thumb || steamImg(r.appId)}
+                    genre="Steam Deal"
+                    price={r.price}
+                    mc={r.mc}
+                    steamAppId={r.appId}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 

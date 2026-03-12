@@ -111,6 +111,12 @@ function InnerApp() {
 
   const handleScoreBonusUsed = useCallback(() => setScoreBonus(0), []);
 
+  // ─── PLAY ────────────────────
+  const handlePlay = useCallback((id) => {
+    setGames(prev => prev.map(g => g.id === id ? { ...g, status: 'playing' } : g));
+    push('info', '▶ Jogo movido para JOGANDO.');
+  }, [setGames, push]);
+
   // ─── Add Game ────────────────────────
   function handleAddGame(newGame) {
     setGames(prev => [newGame, ...prev]);
@@ -242,7 +248,7 @@ function InnerApp() {
             />
           )}
           {view === 'library' && (
-            <Library games={games} onBurn={handleBurn} onAddGame={() => setShowModal(true)} />
+            <Library games={games} onBurn={handleBurn} onPlay={handlePlay} onAddGame={() => setShowModal(true)} />
           )}
           {view === 'smartbuy'  && <SmartBuyV2 games={games} wishlist={wishlist} />}
           {view === 'calendar'  && (

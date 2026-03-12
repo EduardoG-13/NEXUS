@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { getGamePriceByTitle } from '../services/cheapSharkService';
 
 const FILTERS = [
   { id: 'all',      label: 'Todos' },
@@ -17,17 +18,24 @@ function matchFilter(game, filter) {
   if (filter === 'medium')  return game.ttbMain >= 10 && game.ttbMain <= 30;
   if (filter === 'long')    return game.ttbMain > 30 && game.ttbMain <= 60;
   if (filter === 'epic')    return game.ttbMain > 60;
-  return game.status === filter;
+  
+  // Status check
+  if (filter === 'backlog' && game.status === 'backlog') return true;
+  if (filter === 'playing' && game.status === 'playing') return true;
+  if (filter === 'finished' && game.status === 'finished') return true;
+  
+  return false;
 }
 
 const PILL = { backlog: 's-backlog', playing: 's-playing', finished: 's-finished' };
 const PILL_LBL = { backlog: 'BACKLOG', playing: 'JOGANDO', finished: 'FINALIZADO' };
 
-export default function Library({ games, onBurn, onAddGame }) {
+export default function Library({ games, onBurn, onAddGame, onPlay }) {
   const [filter,   setFilter]   = useState('all');
   const [search,   setSearch]   = useState('');
   const [burning,  setBurning]  = useState(new Set());
   const [burned,   setBurned]   = useState(new Set());
+  const [livePrices, setLivePrices] = useState({});
 
   const visible = useMemo(() => games.filter(g => {
     if (burned.has(g.id)) return false;
@@ -35,6 +43,17 @@ export default function Library({ games, onBurn, onAddGame }) {
     if (search && !g.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }), [games, filter, search, burned]);
+
+  useEffect(() => {
+    visible.forEach(async (g) => {
+      const currentVal = g.pricePaid ?? g.price;
+      if (currentVal == null && livePrices[g.id] === undefined) {
+        setLivePrices(prev => ({ ...prev, [g.id]: 'loading' }));
+        const p = await getGamePriceByTitle(g.title);
+        setLivePrices(prev => ({ ...prev, [g.id]: p !== null ? p : 'not_found' }));
+      }
+    });
+  }, [visible]);
 
   function handleBurn(game) {
     if (burning.has(game.id) || burned.has(game.id)) return;
@@ -109,6 +128,7 @@ export default function Library({ games, onBurn, onAddGame }) {
               <tr>
                 <th>JOGO</th>
                 <th>GÊNERO</th>
+                <th>HORAS</th>
                 <th>TTB MAIN</th>
                 <th>TTB 100%</th>
                 <th>PREÇO</th>
@@ -137,12 +157,17 @@ export default function Library({ games, onBurn, onAddGame }) {
                       <div className="g-cover" style={{ display: game.cover ? 'none' : 'flex' }}>{game.emoji}</div>
                       <div>
                         <div className="g-name">{game.title}</div>
-                        <div className="g-platform">{game.platform}{game.hoursPlayed != null ? ` · ${game.hoursPlayed}h jogadas` : ''}</div>
+                        <div className="g-platform">{game.platform}</div>
                       </div>
                     </div>
                   </td>
                   <td>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-muted)' }}>{game.genre}</span>
+                  </td>
+                  <td>
+                    <span className="g-mono" style={{ color: 'var(--accent)' }}>
+                      {game.hoursPlayed != null ? `${game.hoursPlayed}h` : '--'}
+                    </span>
                   </td>
                   <td><span className="g-mono">
                     {game.ttbMain ? `${game.ttbMain}h` : <span style={{ color: 'var(--text-muted)' }}>--h</span>}
@@ -152,9 +177,12 @@ export default function Library({ games, onBurn, onAddGame }) {
                   </span></td>
                   <td>
                     <span className="g-mono dim">
-                      {(game.pricePaid ?? game.price) != null
-                        ? `R$${(game.pricePaid ?? game.price).toFixed(0)}`
-                        : <span style={{ color: 'var(--yellow)' }}>R$--</span>}
+                      {(() => {
+                        const val = game.pricePaid ?? game.price ?? livePrices[game.id];
+                        if (val === 'loading') return <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>buscando...</span>;
+                        if (val === 'not_found') return <span style={{ color: 'var(--yellow)' }}>R$--</span>;
+                        return val != null ? `R$${val.toFixed(2)}` : <span style={{ color: 'var(--yellow)' }}>R$--</span>;
+                      })()}
                     </span>
                   </td>
                   <td>
@@ -169,9 +197,22 @@ export default function Library({ games, onBurn, onAddGame }) {
                   <td><span className={`s-pill ${PILL[game.status]}`}>{PILL_LBL[game.status]}</span></td>
                   <td>
                     <div className="actions-wrap">
-                      {game.status !== 'finished' && (
-                        <button className="btn btn-ghost" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', padding: '4px 9px' }}>
+                      {game.status !== 'finished' && game.status !== 'playing' && (
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 11, fontFamily: 'var(--font-mono)', padding: '4px 9px' }}
+                          onClick={() => onPlay?.(game.id)}
+                        >
                           ▶ Jogar
+                        </button>
+                      )}
+                      {game.status === 'playing' && (
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 11, fontFamily: 'var(--font-mono)', padding: '4px 9px', color: 'var(--green-bright)' }}
+                          onClick={() => alert(`Para marcar como finalizado ou voltar pro Backlog, clique no Card Ativo do Painel Tático ou use o Oráculo (Ex: "zerar ${game.title}").`)}
+                        >
+                          ✓ Concluir
                         </button>
                       )}
                       {game.status === 'backlog' && (
